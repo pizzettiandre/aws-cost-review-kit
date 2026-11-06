@@ -1,0 +1,13 @@
+# Review outputs (may contain client data)
+review_*/
+mapping_KEEP_PRIVATE.json
+findings_*.json
+aws_review_*.html
+aws_review_*.pdf
+*.zip
+!sample/*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/

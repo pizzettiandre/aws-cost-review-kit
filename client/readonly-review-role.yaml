@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Temporary READ-ONLY access for an AWS cost & architecture review.
+  The reviewer can only view configuration, metrics and billing data.
+  The reviewer can NOT create, change or delete anything.
+  Delete this stack when the review is finished to remove the access.
+
+Parameters:
+  ReviewerAccountId:
+    Type: String
+    Description: AWS account ID of the reviewer (provided by your reviewer).
+    AllowedPattern: "^[0-9]{12}$"
+  ExternalId:
+    Type: String
+    Description: Secret phrase shared only between you and your reviewer (min. 12 characters).
+    MinLength: 12
+    NoEcho: true
+
+Resources:
+  ReviewRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ReadOnlyCostArchitectureReview
+      Description: Temporary read-only role for an external cost and architecture review
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${ReviewerAccountId}:root"
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      ManagedPolicyArns:
+        # AWS-managed policy: view configuration of most services, no data access, no changes.
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+      Policies:
+        - PolicyName: ReviewReadOnlyExtras
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CostAndUsageRead
+                Effect: Allow
+                Action:
+                  - ce:Get*
+                  - ce:Describe*
+                  - ce:List*
+                  - savingsplans:Describe*
+                  - compute-optimizer:Get*
+                  - compute-optimizer:Describe*
+                Resource: "*"
+              - Sid: MetricsRead
+                Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                Resource: "*"
+              - Sid: SecurityPostureRead
+                Effect: Allow
+                Action:
+                  - iam:GetAccountSummary
+                  - iam:GenerateCredentialReport
+                  - iam:GetCredentialReport
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetBucketPolicyStatus
+                  - s3:GetLifecycleConfiguration
+                  - s3:GetBucketLocation
+                  - s3:GetEncryptionConfiguration
+                  - guardduty:ListDetectors
+                  - guardduty:GetDetector
+                  - cloudtrail:DescribeTrails
+                  - cloudtrail:GetTrailStatus
+                  - backup:List*
+                  - backup:Describe*
+                Resource: "*"
+              - Sid: NeverReadObjectData
+                Effect: Deny
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - secretsmanager:GetSecretValue
+                  - ssm:GetParameter*
+                  - kms:Decrypt
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: Send this value to your reviewer.
+    Value: !GetAtt ReviewRole.Arn
